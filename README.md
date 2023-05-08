@@ -2,8 +2,6 @@
 This repository is an implementation of the paper *LearnSC: An Efficient and Unified Learning-based Framework for Subgraph Counting Problem*
 
 ## Requirements
----
-
 This implementation has been tested on Ubuntu 20.04 with Python 3.9
 
 |Package|Version|
@@ -15,7 +13,6 @@ This implementation has been tested on Ubuntu 20.04 with Python 3.9
 |torch|1.10.1+cu113|
 |torch-geometric|2.0.3|
 ## Usage
----
 Before running python scripts, please add the src dir to LD_LIBRARY_PATH environment variable:
 ```bash
 export LD_LIBRARY_PATH=/path/to/LearnSC/src:$LD_LIBRARY_PATH
@@ -46,3 +43,5 @@ This is a sample command:
 ```sh
 python main.py --dataname yeast --n-query-node 10 --input-size 72
 ```
+
+The candidate filter used in this repository is from paper [Sun and Luo. In-Memory Subgraph Matching: an In-depth Study. SIGMOD'20] and [Wang et al. Neural Subgraph Counting with Wasserstein Estimator. SIGMOD'22].
