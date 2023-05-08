@@ -44,5 +44,5 @@ The program arguments are list in the following table.
 
 This is a sample command:
 ```sh
-python main.py --dataname iiyeast --n-query-node 10 --input-size 72
+python main.py --dataname yeast --n-query-node 10 --input-size 72
 ```
