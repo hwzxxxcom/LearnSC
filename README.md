@@ -40,7 +40,7 @@ The program arguments are list in the following table.
 |--no-direction-embed|Option|NOT using loss for representation directions in interaction|
 |--no-length-embed|Option|NOT using loss for projection length in interaction|
 |--no-query-decomposition|Option|NOT decomposing query graphs|
-|--no-ndec|Option|Using interaction in NeurSC|
+|--no-ndec|Option|Using NeurSC's interaction|
 
 This is a sample command:
 ```sh
