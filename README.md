@@ -1,4 +1,6 @@
 # LearnSC
+This is an out of date version, to be updated by 9/22/2023.
+
 This repository is an implementation of the paper *LearnSC: An Efficient and Unified Learning-based Framework for Subgraph Counting Problem*
 
 ## Requirements
