@@ -13,7 +13,7 @@ def constructnx(vertices, labels, edges, lmt):
     for u,v in zip(edges[0], edges[1]):
         if (u, v) not in graph.edges:
             graph.add_edge(mapping[u], mapping[v], l=0)
-    return graph
+    return graph, mapping
 
 def load_g_graph(g_file):
     nid = list()
@@ -171,23 +171,6 @@ class NoQDecomposer(QDecomposer):
 
 from filtering import Filtering
 from preprocess import SampleSubgraph
-class GQLGDecomposer(GDecomposer):
-    def __init__(self, name):
-        super().__init__()
-        self.graph_data = load_g_graph('../data/%s/data.grf' % name)
-        self.filter_model = Filtering(None, self.graph_data)
-        self.subgraph_sampler = SampleSubgraph(None, self.graph_data)
-    def decompose(self, graph: nx.Graph, query: nx.Graph, **para):
-        assert 'query_name' in para
-        self.filter_model.update_query(load_p_data(para['query_name']))
-        self.subgraph_sampler.update_query(load_p_data(para['query_name']))
-        try:
-            candidates, candidate_count = self.filter_model.GQL_filter()
-            new_vertices, new_v_label, new_degree, new_edges, new_e_label, new_v_neigh = self.subgraph_sampler.find_subgraph_induced(candidates)
-        except:
-            print('f %s' % para['query_name'])
-            return []
-        return [i for i in new_vertices if len(i) >= 8]
 
 class GQLGDecomposer(GDecomposer):
     def __init__(self, name):
@@ -200,12 +183,12 @@ class GQLGDecomposer(GDecomposer):
         assert 'query_name' in para
         self.filter_model.update_query(load_p_data(para['query_name']))
         self.subgraph_sampler.update_query(load_p_data(para['query_name']))
-        candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = self.filter_model.cpp_GQL(os.path.abspath(para['query_name'].replace('.grf', '.graph')), os.path.abspath('../data/%s/data.graph' % self.dataname))
+        candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = self.filter_model.cpp_GQL(os.path.abspath(para['query_name'].replace('.grf', '.graph')), os.path.abspath('../data/%s/data2.graph' % self.dataname))
         new_vertices, new_v_label, new_degree, new_edges, new_e_label, new_v_neigh = self.subgraph_sampler.load_induced_subgraph(candidates,induced_subgraph_list, neighbor_offset)
         out_vertices, out_v_label, out_degree, out_edges, out_e_label, out_v_neigh = [], [], [], [], [], []
         substructures = []
         for i in range(len(new_vertices)):
-            if len(new_vertices[i]) < 6: continue
+            if len(new_vertices[i]) <= 1: continue
             out_vertices.append(new_vertices[i]) 
             out_v_label.append(new_v_label[i]) 
             out_degree.append(new_degree[i])
@@ -213,7 +196,7 @@ class GQLGDecomposer(GDecomposer):
             out_e_label.append(new_e_label[i])
             out_v_neigh.append(new_v_neigh[i])
             substructures.append(constructnx(new_vertices[i], new_v_label[i], new_edges[i], 0))
-        return substructures
+        return substructures, candidate_info
         
 class GQLGDecomposerN(GDecomposer):
     def __init__(self, name):
@@ -226,12 +209,12 @@ class GQLGDecomposerN(GDecomposer):
         assert 'query_name' in para
         self.filter_model.update_query(load_p_data(para['query_name']))
         self.subgraph_sampler.update_query(load_p_data(para['query_name']))
-        candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = self.filter_model.cpp_GQL(os.path.abspath(para['query_name'].replace('.grf', '.graph')), os.path.abspath('../data/%s/data.graph' % self.dataname))
+        candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = self.filter_model.cpp_GQL(para['query_name'].replace('.grf', '.graph'), '../data/%s/data2.graph' % self.dataname)
         new_vertices, new_v_label, new_degree, new_edges, new_e_label, new_v_neigh = self.subgraph_sampler.find_subgraph_reduced(candidate_info, query, graph)
         out_vertices, out_v_label, out_degree, out_edges, out_e_label, out_v_neigh = [], [], [], [], [], []
         substructures = []
         for i in range(len(new_vertices)):
-            if len(new_vertices[i]) < 6: continue
+            if len(new_vertices[i]) <= 1: continue
             out_vertices.append(new_vertices[i]) 
             out_v_label.append(new_v_label[i]) 
             out_degree.append(new_degree[i])
@@ -239,5 +222,5 @@ class GQLGDecomposerN(GDecomposer):
             out_e_label.append(new_e_label[i])
             out_v_neigh.append(new_v_neigh[i])
             substructures.append(constructnx(new_vertices[i], new_v_label[i], new_edges[i], 0))
-        return substructures
+        return substructures, candidate_info
         

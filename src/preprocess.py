@@ -272,7 +272,52 @@ class SampleSubgraph:
         output_vertices, output_v_label, output_degree, output_edges, output_edge_label, output_v_neigh = self._split_graph(check_info)
         #print(output_vertices)
         return output_vertices, output_v_label, output_degree, output_edges, output_edge_label, output_v_neigh
+    
+    def load_induced_subgraph2(self, candidates, induced_subgraph_list, neighbor_offset):
+        queue = list()
+        depth_queue = list()
+        new_graph_vertices = list()
+        new_graph_v_label = dict()
+        new_graph_v_degree = defaultdict(lambda : 0)
+        new_e_u = list()
+        new_e_v = list()
+        new_edge_label = list()
+        new_graph_v_neigh = defaultdict(list)
 
+        # get data graph information
+        data_label = self.data_graph[1]
+        data_edge = self.data_graph[3]
+        data_neigh = self.data_graph[5]
+
+        new_graph_vertices = deepcopy(candidates)
+        for v in new_graph_vertices:
+            new_graph_v_label[v] = data_label[v]
+
+        for i in range(len(candidates)):
+            vertex = candidates[i]
+            strat_index = neighbor_offset[i]
+            end_index = neighbor_offset[i+1]
+            for j in range(strat_index, end_index):
+                u = induced_subgraph_list[j]
+                new_e_u.append(u)
+                new_e_v.append(vertex)
+                # only add once, since the edge will appear twice.
+                new_graph_v_degree[vertex] += 1
+                new_graph_v_neigh[vertex].append(u)
+                new_edge_label.append(1)
+        
+        new_edges = [deepcopy(new_e_u), deepcopy(new_e_v)]
+        new_vertices = new_graph_vertices
+        new_v_label = new_graph_v_label
+        new_degree = deepcopy(new_graph_v_degree)
+        new_edge_label = deepcopy(new_edge_label)
+        new_v_neigh = new_graph_v_neigh
+
+        check_info = [new_vertices, new_v_label, new_degree, new_edges, new_edge_label, new_v_neigh]
+        output_vertices, output_v_label, output_degree, output_edges, output_edge_label, output_v_neigh = self._split_graph(check_info)
+        #print(output_vertices)
+        return [new_vertices], [new_v_label], [new_degree], [new_edges], [new_edge_label], [new_v_neigh]
+    
     def _split_graph(self, graph_info):
         vertices_id = graph_info[0]
         vertices_label = graph_info[1]
@@ -333,9 +378,64 @@ class SampleSubgraph:
         
         return output_vertices, output_v_label, output_v_degree, output_edges, output_e_label, output_v_neigh
 
+    def _split_graph(self, graph_info):
+        vertices_id = graph_info[0]
+        vertices_label = graph_info[1]
+        vertices_neighbor = graph_info[5]
+        num_vertices = len(vertices_id)
+        to_be_visited = set(vertices_id)
+        
+
+        # initialize the output lists
+        output_vertices = list()
+        output_v_label = list()
+        output_v_degree = list()
+        output_edges = list()
+        output_e_label = list()
+        output_v_neigh = list()
+
+        while len(to_be_visited) > 0:
+            # initialize the temp containers.
+            out_temp_vertices = list()
+            out_temp_v_label = dict()
+            out_temp_v_degree = defaultdict(lambda: 0)
+            out_temp_e_u = list()
+            out_temp_e_v = list()
+            out_temp_e_label = list()
+            out_temp_v_neigh = defaultdict(list)
+
+            start_node = list(to_be_visited)[0]
+            # to_be_visited.remove(start_node)
+            queue = list()
+            queue.append(start_node)
+
+            while len(queue) > 0:
+                current_node = queue.pop(0)
+                if current_node not in to_be_visited: continue
+                current_neighbors = vertices_neighbor[current_node]
+                to_be_visited.remove(current_node)
+                out_temp_vertices.append(current_node)        
+                out_temp_v_label[current_node] = vertices_label[current_node]         
+                for v in current_neighbors:
+                    # a BFS, do we need to check whether it is in the to be visited set? (in Queue it should!)
+                    out_temp_e_u.append(current_node)
+                    out_temp_e_v.append(v)       # add a one-way edge, it will be added again.
+                    out_temp_e_label.append(1)   # edge label is always 1.
+                    out_temp_v_degree[current_node] += 1
+                    out_temp_v_neigh[current_node].append(v)
+                    if v in to_be_visited:
+                        queue.append(v)
+
+            output_vertices.append(deepcopy(out_temp_vertices))
+            output_v_label.append(deepcopy(out_temp_v_label))
+            output_v_degree.append(deepcopy(out_temp_v_degree))
+            output_edges.append([deepcopy(out_temp_e_u), deepcopy(out_temp_e_v)])
+            output_e_label.append(deepcopy(out_temp_e_label))
+            output_v_neigh.append(deepcopy(out_temp_v_neigh))
+        
+        return output_vertices, output_v_label, output_v_degree, output_edges, output_e_label, output_v_neigh
     def update_query(self, query):
         self.query = query
-
 
 def _all_train_and_test(training_percent, name_list):
     example_name = name_list[0]

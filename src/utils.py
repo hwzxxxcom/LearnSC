@@ -10,6 +10,20 @@ from decomposers import *
 from collections import defaultdict
 from copy import deepcopy
 
+def nshuffle(lst):
+    res = []
+    cands = set(lst)
+    for i in lst:
+        if len(cands) == 1 and i in cands: return res
+        res.append(random.choice(list(cands - {i})))
+        cands -= {res[-1]}
+    return res
+
+
+def distance_to_plain(norm, point):
+    assert norm.dim() == point.dim() == 2
+    return torch.sum(norm * point, dim = -1) / torch.sum(norm * norm, dim = -1) ** .5
+
 def log_qerror(pred, card):
     pred = pred.reshape(-1)
     card = card.reshape(-1)
@@ -24,7 +38,7 @@ def qe2lgqe(qe):
 def preprocess_decompose_and_match(gdec: GDecomposer, qdec: QDecomposer, graph: nx.Graph, query: nx.Graph, query_name=None, match_rate=0.1, max_match = 2000):
     QS = QuickSampler()
     subqueries = qdec.decompose(query)
-    substructures = gdec.decompose(graph, query, query_name=query_name)
+    substructures, candidate_info = gdec.decompose(graph, query, query_name=query_name)
     overlap = dict()
     for i in range(len(subqueries)):
         for j in range(len(subqueries)):
@@ -36,16 +50,15 @@ def preprocess_decompose_and_match(gdec: GDecomposer, qdec: QDecomposer, graph: 
     nxsubstructures = []
     for squery in subqueries:
         nxsubqueries.append(nx2nx(nx.subgraph(query, squery)))
-    for sstructure in substructures:
-        nxsubstructures.append(nx2nx(sstructure))
-    for i, sstructure in enumerate(nxsubstructures):
+    for i, (sstructure, mapping) in enumerate(substructures):
         matches[i] = dict()
         for j, squery in enumerate(nxsubqueries):
+            break
             mtches = QS.sample(squery, sstructure, r = 0.4, k = 0.02)
             if mtches:
                 selected = np.random.choice(list(range(len(mtches))), min(math.ceil(len(mtches) * match_rate), math.ceil(math.log(len(mtches) + 1) * 10) + 1, max_match))
                 matches[i][j] = [mtches[i] for i in range(len(mtches))]
-    return subqueries, substructures, overlap, matches
+    return subqueries, substructures, overlap, matches, candidate_info
 
 def preprocess_add_query_nodes(query: nx.Graph, subqueries: list[list[int]],):
     n_orig_node = len(query.nodes)
@@ -113,14 +126,53 @@ def preprocess_query2data(sub_vertices, candidate_info):
                 continue
     return [new_e_u, new_e_v], candidate_dict
 
+def prepeocess_query2data_batch(sstructures, candidate_info):
+    # print(candidate_info)
+    total_len = len(candidate_info)
+    num_query_vertex = int(total_len/2)
+    new_es = [[[], []] for _ in range(len(sstructures))]
+    candidate_dicts = [[set() for i in range(num_query_vertex)] for _ in range(len(sstructures))]
+    n_origin_data_node = max((max(s[1]) for s in sstructures))
+    id_dict = dict() # datav -> ind of sstructure
+    for i, (sstructure, mapping) in enumerate(sstructures):
+        for d_v in mapping:
+            id_dict[d_v] = i
+    for i in range(total_len):
+        #print(i)
+        if i%2 == 1:
+            candidate_list = candidate_info[i].split()
+            query_vertex = i//2
+            for data_vertex in candidate_list:
+                data_vertex = int(data_vertex)
+                if data_vertex not in id_dict: continue
+                ind = id_dict[data_vertex]
+                candidate_dicts[ind][query_vertex].add(sstructures[ind][1][data_vertex])
+                new_es[ind][0].append(query_vertex)
+                new_es[ind][1].append(sstructures[ind][1][data_vertex])
+    return new_es, candidate_dicts
+
+import time
+
 def preprocess(args, g_dec: GDecomposer, q_dec: QDecomposer, graph: nx.Graph, query: nx.Graph, embedder: torch.Tensor, query_name = None, matching_rate = 0.1):
-    subqueries, sstructures, overlap, matches = preprocess_decompose_and_match(g_dec, q_dec, graph, query, query_name, matching_rate)
+    st = time.time()
+    subqueries, sstructures, overlap, matches, candidate_info = preprocess_decompose_and_match(g_dec, q_dec, graph, query, query_name, matching_rate)
     nquery, n_orig_qnode = preprocess_add_query_nodes(query, subqueries)
     substructures = []
+    #print(time.time() - st)
+    interedgess, candidate_dicts = prepeocess_query2data_batch(sstructures, candidate_info)
     interedges = []
-    candidate_dicts = []
-    for sstructure, ss_index in zip(sstructures, matches):
-        nss = nx2nx(sstructure)
+    for q2dedges in interedgess:
+        itedges = torch.LongTensor(q2dedges)
+        assert len(itedges.shape) == 2
+        lst = list(range(len(itedges[1])))
+        random.shuffle(lst)
+        interedges.append(itedges[:, lst[:int(.1*len(lst))]].to(args.device))
+    for (sstructure, mapping), ss_index in zip(sstructures, matches):
+        nsubstructure, n_orig_gnode, match2query = preprocess_add_graph_nodes(graph, sstructure, matches[ss_index])
+        for key in match2query: match2query[key] += n_orig_qnode
+        substructure_feature, substructure_edge = nx2tensor(nsubstructure, embedder, n_orig_gnode)
+        substructures.append((substructure_feature.to(args.device), substructure_edge.to(args.device), n_orig_gnode, match2query))
+        continue
         alphabet = 'abcdefghijklmnopqrstuvwxyz'
         alphabet = ''.join(random.sample(alphabet, 16))
         if 'learnsc' not in os.listdir('/dev/shm'): os.system('mkdir /dev/shm/learnsc')
@@ -128,26 +180,32 @@ def preprocess(args, g_dec: GDecomposer, q_dec: QDecomposer, graph: nx.Graph, qu
         QuickSampler.save2graph(query, '/dev/shm/learnsc/q_%s.graph'%alphabet)
         ginfo = QuickSampler.nx2ginfo(nss, True)
         qinfo = QuickSampler.nx2qinfo(query)
-        try:
-            candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = Filtering(qinfo, ginfo).cpp_GQL('/dev/shm/learnsc/q_%s.graph'%alphabet, '/dev/shm/learnsc/g_%s.graph'%alphabet)
-            subgraph_sampler = SampleSubgraph(qinfo, ginfo)
-            if args.no_ndec:
-                subgraph_info = subgraph_sampler.load_induced_subgraph(candidates,induced_subgraph_list, neighbor_offset)
-            else:
-                subgraph_info = subgraph_sampler.find_subgraph_reduced(candidate_info, query, nss) 
-            q2dedges, candidate_dict = preprocess_query2data(subgraph_info[0][0], candidate_info)
-            query2data_edge_list = torch.LongTensor(q2dedges)
-            interedges.append(query2data_edge_list.to(args.device))
-            candidate_dicts.append(candidate_dict)
-        except:
-            interedges.append(torch.LongTensor([[],[]]).to(args.device))
-            candidate_dicts.append([])
+        if 'try':
+            tag = True
+            if len(ginfo[0]) >= len(qinfo[0]): 
+                candidates, candidate_count, induced_subgraph_list, neighbor_offset, candidate_info = Filtering(qinfo, ginfo).cpp_GQL('/dev/shm/learnsc/q_%s.graph'%alphabet, '/dev/shm/learnsc/g_%s.graph'%alphabet)
+                subgraph_sampler = SampleSubgraph(qinfo, ginfo)
+                if args.no_ndec:
+                    subgraph_info = subgraph_sampler.load_induced_subgraph2(candidates,induced_subgraph_list, neighbor_offset)
+                else:
+                    subgraph_info = subgraph_sampler.find_subgraph_reduced(candidate_info, query, nss) 
+                if (subgraph_info[0]): 
+                    q2dedges, candidate_dict = preprocess_query2data(subgraph_info[0][0], candidate_info)
+                    query2data_edge_list = torch.LongTensor(q2dedges)
+                    itedges = query2data_edge_list.to(args.device)
+                    assert len(itedges.shape) == 2
+                    lst = list(range(len(itedges[1])))
+                    random.shuffle(lst)
+                    interedges.append(itedges[:, lst[:1*len(lst)]])
+                    candidate_dicts.append(candidate_dict)
+                else: tag = False
+            else: tag = False
+            if not tag:
+                interedges.append(torch.LongTensor([[],[]]).to(args.device))
+                candidate_dicts.append([])
         os.system('rm /dev/shm/learnsc/g_%s.graph'%alphabet)
         os.system('rm /dev/shm/learnsc/q_%s.graph'%alphabet)
-        nsubstructure, n_orig_gnode, match2query = preprocess_add_graph_nodes(graph, sstructure, matches[ss_index])
-        for key in match2query: match2query[key] += n_orig_qnode
-        substructure_feature, substructure_edge = nx2tensor(nsubstructure, embedder, n_orig_gnode)
-        substructures.append((substructure_feature.to(args.device), substructure_edge.to(args.device), n_orig_gnode, match2query))
+    
     query_feature, query_edge = nx2tensor(nquery, embedder, n_orig_qnode)
     return ((query_feature.to(args.device), query_edge.to(args.device), n_orig_qnode, overlap, subqueries, query_name), substructures), interedges, candidate_dicts
 
@@ -190,7 +248,8 @@ def constructnx(vertices, labels, edges, lmt):
     for u,v in zip(edges[0], edges[1]):
         if (u, v) not in graph.edges:
             graph.add_edge(mapping[u], mapping[v], l=0)
-    return graph
+    return graph, mapping
+
 
 
 
@@ -244,9 +303,13 @@ def nx2ig(graph, for_sub = False):
 def raise_not_implemented():
     raise NotImplementedError
 
-def nonlinear_func(x):
-    return torch.exp(30 * torch.tanh(1/60 * x))
+def nonlinear_func(x, max_card, min_card):
+    #return torch.exp(x)    
+    return torch.exp(min_card + (max_card - min_card) * (torch.tanh(1/15 * x)/2 + .5) )
+    return torch.exp(min_card + (max_card - min_card) * torch.tanh(1/15 * x))
+    return torch.exp(30 * torch.tanh(1/15 * x))
 
+    
 class QuickSampler():
     def __init__(self):
         self.query = None
@@ -338,12 +401,31 @@ class QuickSampler():
 
     @staticmethod
     def save2graph(graph: nx.Graph, path):
-        with open(path, 'w') as ofile:
-            ofile.write('t %d %d\n' % (len(graph.nodes), len(graph.edges)))
-            for u in graph.nodes:
-                ofile.write('v %d %d %d\n' % (u, graph.nodes[u]['l'], graph.degree[u]))
+        if 'g_' in path:
+            ecount = [0 for _ in graph.nodes]
+            tte = 0
             for u, v in graph.edges:
-                ofile.write('e %d %d\n' % (u, v))
+                if u == v: continue
+                ecount[u] += 2
+                ecount[v] += 2
+                tte += 2
+            with open(path, 'w') as ofile:
+                ofile.write('t %d %d\n' % (len(graph.nodes), tte))
+                for u in graph.nodes:
+                    ofile.write('v %d %d %d\n' % (u, graph.nodes[u]['l'], ecount[u]))
+                for u, v in graph.edges:
+                    if u == v: continue
+                    ofile.write('e %d %d\n' % (u, v))
+                    ofile.write('e %d %d\n' % (v, u))
+        else:
+            with open(path, 'w') as ofile:
+                ofile.write('t %d %d\n' % (len(graph.nodes), len(graph.edges)))
+                for u in graph.nodes:
+                    ofile.write('v %d %d %d\n' % (u, graph.nodes[u]['l'], graph.degree[u]))
+                for u, v in graph.edges:
+                    if u == v: continue
+                    ofile.write('e %d %d\n' % (u, v))
+
 
     @staticmethod
     def nx2ginfo(graph: nx.Graph, tag = False):
