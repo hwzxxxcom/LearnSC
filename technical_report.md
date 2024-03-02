@@ -32,6 +32,17 @@ In estimation phase, the readout vectors of subqueries and substructures are con
 The complexity of aggregation phase is $O(|\mathcal{G}|\cdot|\mathcal{Q}|)$.
 As a result, the total complexity of $\textsf{ LearnSC}$ is $O(|E_G|\cdot|E_Q|+|V_G|\cdot|v_Q|)$. 
 
+## Accuracy varying data graph size$
+
+![Accuracy varying data graph size](figures
+/tbl_datasize.png)
+
+## Variants of $\textsf{LearnSC}$
+
+![Variants of LearnSC](figures
+/tbl_variants.png)
+
+
 ## Reference
 
 [1] Huahai He and Ambuj K. Singh. Graphs-at-a-Time: Query Language and Access Methods for Graph Databases. SIGMOD. 2008. 405–418.
