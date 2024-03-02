@@ -42,7 +42,8 @@ The results show that the overall errors of all evaluated methods increase with 
 ## Variants of $\textsf{LearnSC}$
 
 ![Variants of LearnSC](./figures/tbl_variants.png)
-
+We now evaluate different variants of $\textsf{LearnSC}$. The results are shown in the above table.
+In addition to the variants provided in the paper, we introduce an additional variant where the GNN layer of $\textsf{LearnSC}$ is replaced with a new powerful GNN, GPS, denoted as $\textsf{LearnSC-GPS}$. The results indicate that adopting the new GNN structure can further enhance the performance of $\textsf{LearnSC}$.
 
 ## Reference
 
