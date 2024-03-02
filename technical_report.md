@@ -17,7 +17,7 @@ The time complexity of part (ii) is $O(|E_Q| \cdot |V_G|^2)$, i.e., for each edg
 The time complexity to part (iii) is $O(|E_G|+|V_G|)$ as none of edge in $G$ is pruned in the reduced graph $rG$ at worst-case.
 The summation of the cost of these three parts is the total time cost of Algorithm 2.
 
-## Total Time Complexity of $\textsf{ LearnSC}$
+## Total Time Complexity of $\textsf{LearnSC}
 
 We now consider the total time complexity of $\textsf{ LearnSC}$. We follow the five phases of $\textsf{ LearnSC}$ to compute the time complexity.
 
@@ -36,6 +36,9 @@ As a result, the total complexity of $\textsf{ LearnSC}$ is $O(|E_G|\cdot|E_Q|+|
 
 ![Accuracy varying data graph size](./figures/tbl_datasize.png)
 
+We evaluate $\textsf{LearnSC}$, $\textsf{NeurSC}$, $\textsf{LSS}$, and $\textsf{Alley}$ on accuracy varying data graph size.
+We extracted subgraphs with 100, 1000, 10000, and 100000 nodes from the DBLP data graph, and report the $q$-errors.
+The results show that the overall errors of all evaluated methods increase with the growing scale of the data set, however, the error of LearnSC is always controlled at a relatively low level.
 ## Variants of $\textsf{LearnSC}$
 
 ![Variants of LearnSC](./figures/tbl_variants.png)
