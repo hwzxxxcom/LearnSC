@@ -34,13 +34,11 @@ As a result, the total complexity of $\textsf{ LearnSC}$ is $O(|E_G|\cdot|E_Q|+|
 
 ## Accuracy varying data graph size$
 
-![Accuracy varying data graph size](./figures
-/tbl_datasize.png)
+![Accuracy varying data graph size](./figures/tbl_datasize.png)
 
 ## Variants of $\textsf{LearnSC}$
 
-![Variants of LearnSC](./figures
-/tbl_variants.png)
+![Variants of LearnSC](./figures/tbl_variants.png)
 
 
 ## Reference
