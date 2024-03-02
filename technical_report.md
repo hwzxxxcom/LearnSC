@@ -39,7 +39,7 @@ As a result, the total complexity of $\textsf{ LearnSC}$ is $O(|E_G|\cdot|E_Q|+|
 We evaluate $\textsf{LearnSC}$, $\textsf{NeurSC}$, $\textsf{LSS}$, and $\textsf{Alley}$ on accuracy varying data graph size.
 We extracted subgraphs with 100, 1000, 10000, and 100000 nodes from the DBLP data graph, and report the $q$-errors.
 The results show that the overall errors of all evaluated methods increase with the growing scale of the data set, however, the error of LearnSC is always controlled at a relatively low level.
-## Variants of $\textsf{LearnSC}
+## Variants of $\textsf{LearnSC}$
 
 ![Variants of LearnSC](./figures/tbl_variants.png)
 We now evaluate different variants of $\textsf{LearnSC}$. The results are shown in the above table.
